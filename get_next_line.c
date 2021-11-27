@@ -6,52 +6,56 @@
 /*   By: rpohlen <rpohlen@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/11/25 19:10:45 by rpohlen           #+#    #+#             */
-/*   Updated: 2021/11/27 05:10:45 by rpohlen          ###   ########.fr       */
+/*   Updated: 2021/11/27 06:35:00 by rpohlen          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "get_next_line.h"
 
 /* -----------------------------------------------------------------------
-**		ft_realloc_byte
+**		realloc_line
 **
-**	Duplicates a string with enough space for an additional character
-**		before freeing the old string and returning the new one.
+**	Duplicates old, if it exists, concatenates a portion of the
+**		buffer to it, and frees old.
 **
-**	Can be used with a NULL pointer to simply malloc a single-character
-**		string, to start the chain.
+**	In this case, old represents the unfinished line we have started
+**		writing, or NULL if we haven't written anything yet.
 **
-**	This is used to effortlessly fill the line byte per byte
-**		regardless of buffer size.
+**	The portion of the buffer that will be concatenated is all or part
+**		of the line, and will either stop at a newline, or at the end
+**		of the buffer.
 **
-**	This isn't optimized and will become really slow for really long lines.
+**	Note that this will be very inefficient when BUFFER_SIZE is 1.
+**	However, this limitation is unavoidable.
 **
-**	- old		old string to carry over
-**	- c			character to add to the new string
+**	- old		part of the line that has been written so far
+**	- buffer	buffer of which a portion will be added to the line
+**	- len		length of the portion to add
 ** -------------------------------------------------------------------- */
-static char	*ft_realloc_byte(char *old, char c)
+static char	*realloc_line(char *old, char *buffer, size_t len)
 {
-	size_t	i;
 	char	*new;
+	size_t	i;
+	size_t	j;
 
 	i = 0;
 	while (old && old[i])
 		i++;
-	new = malloc((i + 2) * sizeof(*new));
-	if (! new)
-		return (NULL);
-	if (old)
+	new = malloc((i + len + 1) * sizeof(*new));
+	i = 0;
+	while (old && old[i])
 	{
-		i = 0;
-		while (old[i])
-		{
-			new[i] = old[i];
-			i++;
-		}
-		free(old);
+		new[i] = old[i];
+		i++;
 	}
-	new[i] = c;
-	new[i + 1] = 0;
+	free(old);
+	j = 0;
+	while (j < len)
+	{
+		new[i + j] = buffer[j];
+		j++;
+	}
+	new[i + j] = 0;
 	return (new);
 }
 
@@ -73,19 +77,15 @@ static char	*ft_realloc_byte(char *old, char c)
 ** -------------------------------------------------------------------- */
 static int	parse_buffer(t_listfd *data, char **line)
 {
-	while (data->index < data->size && data->buffer[data->index] != '\n')
-	{
-		*line = ft_realloc_byte(*line, data->buffer[data->index]);
-		if (! *line)
-			return (1);
+	size_t	start;
+
+	start = data->index;
+	while (data->index < data->size - 1 && data->buffer[data->index] != '\n')
 		data->index++;
-	}
-	if (data->index < data->size && data->buffer[data->index] == '\n')
-	{
-		*line = ft_realloc_byte(*line, '\n');
-		data->index++;
+	data->index++;
+	*line = realloc_line(*line, data->buffer + start, data->index - start);
+	if (data->buffer[data->index - 1] == '\n')
 		return (1);
-	}
 	return (0);
 }
 
